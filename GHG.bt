@@ -1,0 +1,322 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+struct Texture{
+    uint width,height;
+    uint layers;
+    uint format;
+    uint unk;
+    uint size;
+    uchar data[size];
+
+};
+struct Chunk{
+    char name[4];
+    uint size;
+    if(name=="VBIB"){
+    uchar data[size-8+32];
+    }else if(name=="GSNH"){
+        local uint tmp = FTell();
+        uint texture_pointers;
+        uint tex_count;
+        int image_meta_offset;
+        int materials_offset;
+        int materials_count;
+        int unk_offset_1;
+        int unk_offset_2;
+        uchar unk_1[40-16];
+        uint mesh_meta_offset;
+        int name_offset;
+        uchar unk_2[0x130-4];
+        uint bone_count;
+        int bone_data_offset;
+        int unk_3[8];
+        uint layer_count;
+        int layer_offset;
+        local uint l = FTell()-4+layer_offset;
+        int unk_4[2];
+        float unk_5[12];
+        int unk_6;
+        local uint l2 = FTell()-4+unk_6;
+        FSeek(l);
+        struct{
+            struct LayerSubData{
+                    int unk1;
+                    int unk2;
+                    int offset;
+                    local uint ll2 = FTell();
+                    FSeek(ll2+offset);
+                    struct{
+                        float mat[16];
+                        float unk[11];
+                        float mat2[16];
+                        int material_info_offset;
+                        int name_offset;
+                        local uint name_offset_ = FTell()-4+name_offset;
+                        FSeek(name_offset_);
+                        string name;
+                        FSeek(ll2+offset+176);
+                    }layer_part_info;
+                    FSeek(ll2);
+                };
+
+            local uint ls = FTell();
+            int name_offset;
+            int p1;
+            local uint p1l = FTell()-4+p1;
+            int p2;
+            local uint p2l = FTell()-4+p2;
+            int p3;
+            local uint p3l = FTell()-4+p3;
+            int p4;
+            local uint p4l = FTell()-4+p4;
+            Printf("%i %i %i %i\n",p1,p2,p3,p4);;
+            if(p2){
+                FSeek(p2l);
+                LayerSubData layer2_data;
+            }
+            if(p4){
+                FSeek(p4l);
+                LayerSubData layer4_data;
+            }
+            FSeek(ls+20);
+
+        }layers[layer_count]<optimize=false>;
+        FSeek(l2);
+        struct{
+            int unk_0;
+            int unk_4;
+            int unk_8;
+            int unk_12;
+            int parts_offset;
+            local uint l = FTell()-4+parts_offset;
+            int part_count;
+            int unk_24;
+            int unk_28;
+            
+            local int i;
+            for(i=0;i<part_count;i++){
+                FSeek(l+4*i+ReadInt(l+4*i));
+                struct{
+                    int unk_0;
+                    int indices_count;
+                    int16 vertex_size;
+                    int16 unk_10;
+                    int unk_12;
+                    int unk_16;
+
+                    int vertex_offset;
+                    int vertex_count;
+                    int indices_offset;
+                    int indices_buffer_id;
+                    int vertices_buffer_id;
+                    int unk_40;
+                    int unk_44;
+                    int unk_48;
+
+                }Part;
+            };
+            FSeek(l);
+
+        }unk_5_data;
+        FSeek(tmp+size-8);
+    }else if(name=="MS00"){
+        local uint tmp = FTell();
+        uint count;
+        struct{
+            local uint tmp2 = FTell();
+            int zeros[14];
+            int unk1;
+            int id;
+            int mat_info_offset;
+            int unk2;
+            int unk3;
+            int unk4;
+            int unk5;
+            int unk6;
+            float diff_color[4];
+            float unk7[4];
+            int16 tex_id;
+            int16 unk8;
+            int unk9;
+            int field_80;
+            float field_84[4];
+            int field_94;
+            int field_98;
+            int field_9C;
+            int field_A0;
+            int field_A4;
+            int field_A8;
+            int field_AC;
+            int field_B0;
+            int field_B4;
+            int field_B8;
+            int tex_id9;
+            int tex_id10;
+            int tex_id11;
+            int tex_id13;
+            byte color[4];
+            int unk10[3];
+            float unk11[4];
+            int tex_id3;
+            int tex_id5;
+            int field_F4;
+            int field_F8;
+            int field_FC;
+            int tex_id2;
+            int tex_id4;
+            int tex_id7;
+            int tex_id8;
+            int tex_id12;
+            int tex_id14;
+            int field_118;
+            int field_11C;
+            int field_120;
+            int field_124;
+            int field_128;
+            int field_12C;
+            float field_130[12];
+            int field_160;
+            int field_164;
+            int field_168;
+            int field_16C;
+            int field_170;
+            int field_174;
+            int field_178;
+            int field_17C;
+            int field_180;
+            int field_184;
+            int field_188;
+            int field_18C;
+            int field_190;
+            int field_194;
+            int field_198;
+            int field_19C;
+            int field_1A0;
+            int field_1A4;
+            int field_1A8;
+            int field_1AC;
+            int field_1B0;
+            int field_1B4;
+            int field_1B8;
+            int field_1BC;
+            int field_1C0;
+            int field_1C4;
+            int field_1C8;
+            int field_1CC;
+            int field_1D0;
+            int field_1D4;
+            int field_1D8;
+            int field_1DC;
+            int field_1E0;
+            int field_1E4;
+            int field_1E8;
+            int field_1EC;
+            int field_1F0;
+            int field_1F4;
+            int field_1F8;
+            int field_1FC;
+            int field_200;
+            int field_204;
+            int field_208;
+            int field_20C;
+            int field_210;
+            int field_214;
+            int field_218;
+            int field_21C;
+            int field_220;
+            int field_224;
+            int field_228;
+            int field_22C;
+            int field_230;
+            int field_234;
+            int field_238;
+            int field_23C;
+            int field_240;
+            int field_244;
+            int field_248;
+            int field_24C;
+            int tex_id6;
+            int field_254;
+            int field_258;
+            int field_25C;
+            int field_260;
+            int field_264;
+            int field_268;
+            int field_26C;
+            int field_270;
+            int field_274;
+            int field_278;
+            int field_27C;
+            int field_280;
+            int field_284;
+            int field_288;
+            int field_28C;
+            int field_290;
+            int field_294;
+            int field_298;
+            int tex_id16;
+            int tex_id15;
+            int field_2A4;
+            int field_2A8;
+            int field_2AC;
+            int field_2B0;
+            int field_2B4;
+            int field_2B8;
+            int field_2BC;
+            int field_2C0;
+            FSeek(tmp2+708);
+        }materials[count];
+        FSeek(tmp+size-8);
+    }
+    else{
+        uchar data[size-8];
+    };
+};
+
+
+
+uint nu_offset;
+uint16 tex_count;
+Texture textures[tex_count] <optimize=false>;
+uint16 v_buffer_count;
+struct{
+    uint size;
+    uchar data[size];
+
+}vertex_buffers[v_buffer_count]<optimize=false>;
+
+uint16 i_buffer_count;
+struct{
+    uint size;
+    uchar data[size];
+
+}index_buffers[i_buffer_count]<optimize=false>;
+
+FSeek(nu_offset+4);
+struct{
+    char magic[4];
+    int n_size;
+    uint version;
+    uint zero;
+} NUHeader;
+local uint failsafe = 0;
+while(!FEof()){
+    Chunk chunk<optimize=false>;
+
+    failsafe++;
+    if(failsafe>100){
+        Printf("FAILSAFE TRIGGERED!!");
+        break;    
+    }
+};
+//1947910

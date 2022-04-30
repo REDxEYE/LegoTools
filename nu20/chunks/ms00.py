@@ -15,7 +15,7 @@ class Material:
         self.unk4 = reader.read_uint32()
         self.unk5 = reader.read(12)
         self.diffuse_color = reader.read_fmt('4f')
-        self.unk7 = reader.read(0x12-2)
+        self.unk7 = reader.read(0x12 - 2)
         self.texture_id = reader.read_int16()
         self.unk8 = reader.read(0x52)
         self.color = reader.read_fmt('4B')
@@ -26,13 +26,16 @@ class Material:
 
 class MS00(Chunk):
 
-    def __init__(self, offset: int, name: str, size: int, buffer: bytes):
-        super().__init__(offset, name, size, buffer)
+    def __init__(self, name: str, size: int, reader: ByteIO):
+        super().__init__(name, size, reader)
         self.materials: List[Material] = []
-        material_count = self.reader.read_uint32()
+        with reader.new_region('MS00') as reg:
+            material_count = self.reader.read_uint32()
 
-        for _ in range(material_count):
-            self.materials.append(Material(self.reader))
+            for _ in range(material_count):
+                with reg.sub_region('MS00::Material'):
+                    self.materials.append(Material(self.reader))
+            self.unk = reader.read_fmt('3i')
 
     def __getitem__(self, item):
         assert type(item) is int

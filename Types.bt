@@ -1,0 +1,31 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+struct Layer{
+    int name_offset;
+    uint p1,p2,p3,p4;
+
+};
+
+struct Bone{
+    float matrix[16];
+    uchar unk[12];
+    int name_offset;
+    byte parent_id;
+    uchar unk2[15];
+};
+
+struct LayerPartInfo{
+    int part_count;
+    int material_list_offset;
+    int unk_offset;
+};

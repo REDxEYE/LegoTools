@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List
 
 from LegoTools.nu20 import Chunk
+from LegoTools.utils.byte_io_lg import ByteIO
 
 
 @dataclass
@@ -14,14 +15,15 @@ class TextureMeta:
 
 class TST0(Chunk):
 
-    def __init__(self, offset: int, name: str, size: int, buffer: bytes):
-        super().__init__(offset, name, size, buffer)
+    def __init__(self, name: str, size: int, reader: ByteIO):
+        super().__init__(name, size, reader)
         self.meta: List[TextureMeta] = []
         reader = self.reader
-
-        reader.skip(24)
-        while reader:
-            width, height = reader.read_fmt('2I')
-            guid = reader.read(16)
-            unk = reader.read(16)
-            self.meta.append(TextureMeta(width, height, guid, unk))
+        with reader.new_region('TST0') as reg:
+            reader.skip(24)
+            while reader.tell() < self.offset + size - 8:
+                with reg.sub_region('TST0::TextureMeta'):
+                    width, height = reader.read_fmt('2I')
+                    guid = reader.read(16)
+                    unk = reader.read(16)
+                self.meta.append(TextureMeta(width, height, guid, unk))

@@ -1,6 +1,6 @@
 from typing import List
 
-from LegoTools.nu20.chunk import Chunk
+from LegoTools.nu20.chunk import Chunk, DummyChunk
 from LegoTools.nu20.chunks.gsnh import GSNH
 from LegoTools.nu20.chunks.head import Head
 from LegoTools.nu20.chunks.ms00 import MS00
@@ -14,9 +14,8 @@ from LegoTools.utils.byte_io_lg import ByteIO
 # noinspection PyShadowingNames
 class NU20:
 
-    def __init__(self, offset, buffer: bytes):
-        self.offset = offset
-        reader = self.reader = ByteIO(buffer)
+    def __init__(self, reader: ByteIO):
+        self.reader = reader
         self.version = reader.read_int32()
         reader.read(4)
         self.chunks = []
@@ -26,24 +25,23 @@ class NU20:
     def read_chunk(self):
         reader = self.reader
         name, size = reader.read_fourcc(), reader.read_uint32()
-        offset = reader.tell()+8
 
         if name == 'HEAD':
-            return Head(self.offset + offset, name, size, reader.read(size - 8))
+            return Head(name, size, reader)
         elif name == 'NTBL':
-            return NTBL(self.offset + offset, name, size, reader.read(size - 8))
+            return NTBL(name, size, reader)
         elif name == 'MS00':
-            return MS00(self.offset + offset, name, size, reader.read(size - 8))
+            return MS00(name, size, reader)
         elif name == 'TST0':
-            return TST0(self.offset + offset, name, size, reader.read(size - 8))
+            return TST0(name, size, reader)
         elif name == 'PNTR':
-            return PNTR(self.offset + offset, name, size, reader.read(size - 8))
+            return PNTR(name, size, reader)
         elif name == 'GSNH':
-            return GSNH(self.offset + offset, name, size, reader.read(size - 8))
+            return GSNH(name, size, reader)
         elif name == 'VBIB':
-            return VBIB(self.offset + offset, name, size, reader.read(size - 8 + 32))
+            return VBIB(name, size, reader)
         else:
-            return Chunk(self.offset + offset, name, size, reader.read(size - 8))
+            return DummyChunk(name, size, reader)
 
     def expect_chunk(self, name):
         chunk = self.read_chunk()

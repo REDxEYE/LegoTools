@@ -2,10 +2,12 @@ import binascii
 import contextlib
 import io
 import struct
-import typing
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Union, BinaryIO
+from typing import Union, BinaryIO, List, Optional
+
+from pyasn1_modules.rfc7906 import Register
 
 
 class OffsetOutOfBounds(Exception):
@@ -14,6 +16,28 @@ class OffsetOutOfBounds(Exception):
 
 def split(array, n=3):
     return [array[i:i + n] for i in range(0, len(array), n)]
+
+
+@dataclass
+class Record:
+    reader: 'ByteIO'
+    name: str
+    start: int
+    end: int
+    type_name: str
+    sizeof: int
+    childs: List['Record'] = field(default_factory=list)
+
+    @property
+    def size(self):
+        return self.end - self.start
+
+    @contextlib.contextmanager
+    def sub_region(self, name, type_name='char', sizeof=1) -> 'Record':
+        child = Record(self.reader, name, self.reader.tell(), 0, type_name, sizeof)
+        yield child
+        child.end = self.reader.tell()
+        self.childs.append(child)
 
 
 class ByteIO:
@@ -38,6 +62,56 @@ class ByteIO:
             self.file = path_or_file_or_data
         else:
             self.file = BytesIO()
+
+        self.regions: List[Record] = []
+
+    @property
+    def active_region(self):
+        if not self.regions:
+            return None
+        if self.regions[-1].end == 0:
+            return self.regions[-1]
+        else:
+            return None
+
+    def begin_region(self, name, type_name='char', sizeof=1):
+        record = Record(self, name, self.tell(), 0, type_name, sizeof)
+        self.regions.append(record)
+        return record
+
+    def end_region(self):
+        self.regions[-1].end = self.tell()
+
+    @contextlib.contextmanager
+    def new_region(self, name, type_name='char', sizeof=1) -> Record:
+        yield self.begin_region(name, type_name, sizeof)
+        self.end_region()
+
+    def export_as_010editor_bookmarks(self, output_file):
+        import csv
+        import hashlib
+        with open(output_file, 'w', newline='') as c:
+            writer = csv.writer(c)
+            writer.writerow(['Name', 'Value', 'Start', 'Size', 'Color'])
+            for region in self.regions:
+                color = int.from_bytes(hashlib.sha256(region.name.encode('ascii')).digest()[:4], 'little')
+                writer.writerow(
+                    [f'{region.type_name} {region.name}' + (
+                        f'[{region.size // region.sizeof}]' if region.size != region.sizeof else ''),
+                     '',
+                     f'{region.start:X}h',
+                     f'{region.size:X}h',
+                     f'Fg: Bg:0x{color:X}'])
+                if region.childs:
+                    for child in region.childs:
+                        color = int.from_bytes(hashlib.sha256(child.name.encode('ascii')).digest()[:4], 'little')
+                        writer.writerow(
+                            [f'{child.type_name} {child.name}' + (
+                                f'[{child.size//child.sizeof}]' if child.size != child.sizeof else ''),
+                             '',
+                             f'{child.start:X}h',
+                             f'{child.size:X}h',
+                             f'Fg: Bg:0x{color:X}'])
 
     def __del__(self):
         if isinstance(self.file, BytesIO):

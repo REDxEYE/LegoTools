@@ -95,9 +95,9 @@ class GHG:
             reader.read_uint32()
             magic = reader.read_uint32()
             assert magic == 0x3032554E, f'Invalid magic, expected 0x3032554E, got {magic}'
-            nu_size = -reader.read_int32()
-            self.nu20 = NU20(nu20_offset + 4, reader.read(nu_size - 8))
-            del magic, nu_size, texture_count, nu20_offset, indices_buffers_count, vertex_buffers_count
+            reader.read_int32()
+            self.nu20 = NU20(reader)
+            del magic, texture_count, nu20_offset, indices_buffers_count, vertex_buffers_count
 
         # for i, texture in enumerate(self.textures):
         #     with open(f'tmp_{i}.dds', 'wb') as f:
@@ -110,23 +110,24 @@ class GHG:
         self.scene_name = reader.read_ascii_string()
 
         reader.seek(gsnh.mesh_meta_offset + 0x14)
-        part_count = reader.read_uint32()
-        reader.skip(8)
-        part_offsets = [reader.tell() + reader.read_int32() for _ in range(part_count)]
+        with reader.new_region('PartsOffsets'):
+            part_count = reader.read_uint32()
+            reader.skip(8)
+            part_offsets = [reader.tell() + reader.read_int32() for _ in range(part_count)]
 
         self.meshes: List[Mesh] = []
-
-        for part_offset in part_offsets:
+        for part_id, part_offset in enumerate(part_offsets):
             reader.seek(part_offset)
-            assert reader.read_uint32() == 6
-            indices_count = reader.read_uint32() + 2
-            vertex_size = reader.read_int16()
-            reader.skip(0xa)
-            vertex_offset, vertex_count, indices_offset = reader.read_fmt('3I')
-            indices_buffer_id, vertices_buffer_id = reader.read_fmt('2I')
-            indices = indices_buffers[indices_buffer_id][indices_offset:indices_offset + indices_count]
-            vertices_buffer = vertex_buffers[vertices_buffer_id][
-                              vertex_offset * vertex_size:vertex_offset * vertex_size + vertex_count * vertex_size]
+            with reader.new_region(f'PartsInfo::Part_{part_id}'):
+                assert reader.read_uint32() == 6
+                indices_count = reader.read_uint32() + 2
+                vertex_size = reader.read_int16()
+                reader.skip(0xa)
+                vertex_offset, vertex_count, indices_offset = reader.read_fmt('3I')
+                indices_buffer_id, vertices_buffer_id = reader.read_fmt('2I')
+                indices = indices_buffers[indices_buffer_id][indices_offset:indices_offset + indices_count]
+                vertices_buffer = vertex_buffers[vertices_buffer_id][
+                                  vertex_offset * vertex_size:vertex_offset * vertex_size + vertex_count * vertex_size]
             mesh = Mesh(vertices_buffer, vertex_size, indices)
             self.meshes.append(mesh)
             del (indices_count, vertex_size, vertex_offset, vertex_count,
@@ -136,89 +137,125 @@ class GHG:
 
         reader.seek(gsnh.bone_offset)
         self.bones = []
-        for bone in range(gsnh.bone_count):
-            mat = np.frombuffer(reader.read(64), np.float32).reshape((4, 4)).T
-            reader.skip(12)
-            name_offset = reader.tell() + reader.read_int32()
-            with reader.save_current_pos():
-                reader.seek(name_offset)
-                bone_name = reader.read_ascii_string()
-            parent_id = reader.read_int8()
-            reader.skip(3 + 12)
-            self.bones.append(Bone(bone_name, mat, parent_id))
-            del name_offset, parent_id, mat, bone_name
-        for bone_id, bone in enumerate(self.bones):
-            mat = np.frombuffer(reader.read(64), np.float32).reshape((4, 4)).T
-            # if bone.parent_id != -1:
-            #     mat = np.matmul(mat, self.bones[bone.parent_id].mat)
-            bone.mat = mat
-        del mat
+        with reader.new_region('Bones') as reg:
+            for bone in range(gsnh.bone_count):
+                with reg.sub_region(f'Bones::Bone_{bone}', 'Bone', 0x60):
+                    mat = np.frombuffer(reader.read(64), np.float32).reshape((4, 4)).T
+                    reader.skip(12)
+                    name_offset = reader.tell() + reader.read_int32()
+                    with reader.save_current_pos():
+                        reader.seek(name_offset)
+                        bone_name = reader.read_ascii_string()
+                    parent_id = reader.read_int8()
+                    reader.skip(3 + 12)
+                self.bones.append(Bone(bone_name, mat, parent_id))
+                del name_offset, parent_id, mat, bone_name
+        with reader.new_region('BoneMatrices'):
+            for bone_id, bone in enumerate(self.bones):
+                bone.mat = np.frombuffer(reader.read(64), np.float32).reshape((4, 4)).T
 
         reader.seek(gsnh.layer_offset)
         self.layers: List[Layer] = []
-        for layer_id in range(gsnh.layer_count):
-            name_offset = reader.tell() + reader.read_int32()
-            with reader.save_current_pos():
-                reader.seek(name_offset)
-                layer_name = reader.read_ascii_string()
-            p1 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
-            p2 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
-            p3 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
-            p4 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
-            self.layers.append(Layer(layer_name, p1, p2, p3, p4, []))
-            del p1, p2, p3, p4, layer_name, name_offset
+        with reader.new_region('Layers') as reg:
+            for layer_id in range(gsnh.layer_count):
+                with reg.sub_region(f'Layers::Layer_{layer_id}', 'Layer', 0x14):
+                    name_offset = reader.tell() + reader.read_int32()
+                    with reader.save_current_pos():
+                        reader.seek(name_offset)
+                        layer_name = reader.read_ascii_string()
+                    p1 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
+                    p2 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
+                    p3 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
+                    p4 = reader.read_int32() if reader.peek_int32() == 0 else reader.tell() + reader.read_int32()
+                self.layers.append(Layer(layer_name, p1, p2, p3, p4, []))
+                del p1, p2, p3, p4, layer_name, name_offset
 
-        for layer in self.layers:
+        for n, layer in enumerate(self.layers):
             if layer.p1:
                 reader.seek(layer.p1)
-                for bone_id, _ in enumerate(self.bones):
-                    offset = reader.read_int32()
-                    if offset:
-                        with reader.save_current_pos():
-                            reader.seek(offset + reader.tell() - 4)
-                            reader.skip(8)
-                            reader.seek(reader.tell() + reader.read_int32())
-                            reader.skip(176)
-                            reader.seek(reader.tell() + reader.read_int32())
-                            part_count = reader.read_int32()
-                            reader.seek(reader.tell() + reader.read_int32())
-                            materials = [reader.read_int32() for _ in range(part_count)]
-                        layer.bone_part_pairs.append(BonePartPair(0, bone_id, part_count, materials))
+                with reader.new_region(f'Layer_{n}::P1::BoneOffsets', 'int', sizeof=4):
+                    bone_offsets = {}
+                    for bone_id, _ in enumerate(self.bones):
+                        offset = reader.read_int32()
+                        if offset:
+                            bone_offsets[bone_id] = reader.tell() - 4 + offset
+                for bone_id, offset in bone_offsets.items():
+                    reader.seek(offset)
+                    with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}'):
+                        reader.skip(8)
+                        data_offset = reader.tell() + reader.read_int32()
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}::Unk2'):
+                        reader.skip(176)
+                        data_offset = reader.tell() + reader.read_int32()
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}::Unk2::PartInfo', 'LayerPartInfo', 0xC):
+                        part_count = reader.read_int32()
+                        data_offset = reader.tell() + reader.read_int32()
+                        reader.skip(4)
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}::PartInfo::MaterialList', 'int', 4):
+                        materials = [reader.read_int32() for _ in range(part_count)]
+                    layer.bone_part_pairs.append(BonePartPair(2, bone_id, part_count, materials))
 
             if layer.p2:
                 reader.seek(layer.p2)
-                reader.skip(8)
-                reader.seek(reader.tell() + reader.read_int32())
-                reader.skip(0xB0)
-                reader.seek(reader.tell() + reader.read_int32())
-                part_count = reader.read_int32()
-                reader.seek(reader.tell() + reader.read_int32())
-                materials = [reader.read_int32() for _ in range(part_count)]
+                with reader.new_region(f'Layer_{n}::P2'):
+                    reader.skip(8)
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P2::Unk'):
+                    reader.skip(0xB0)
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P2::Unk::PartInfo'):
+                    part_count = reader.read_int32()
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P2::Unk::PartInfo::MaterialList'):
+                    materials = [reader.read_int32() for _ in range(part_count)]
                 layer.bone_part_pairs.append(BonePartPair(1, -1, part_count, materials))
 
             if layer.p3:
                 reader.seek(layer.p3)
-                for bone_id, _ in enumerate(self.bones):
-                    offset = reader.read_int32()
-                    if offset:
-                        with reader.save_current_pos():
-                            reader.seek(offset + reader.tell() - 4)
-                            reader.skip(8)
-                            reader.seek(reader.tell() + reader.read_int32())
-                            reader.skip(176)
-                            reader.seek(reader.tell() + reader.read_int32())
-                            part_count = reader.read_int32()
-                            reader.seek(reader.tell() + reader.read_int32())
-                            materials = [reader.read_int32() for _ in range(part_count)]
-                        layer.bone_part_pairs.append(BonePartPair(2, bone_id, part_count, materials))
+                with reader.new_region(f'Layer_{n}::P3::BoneOffsets', 'int', sizeof=4):
+                    bone_offsets = {}
+                    for bone_id, _ in enumerate(self.bones):
+                        offset = reader.read_int32()
+                        if offset:
+                            bone_offsets[bone_id] = reader.tell() - 4 + offset
+                for bone_id, offset in bone_offsets.items():
+                    reader.seek(offset)
+                    with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}'):
+                        reader.skip(8)
+                        data_offset = reader.tell() + reader.read_int32()
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}::Unk2'):
+                        reader.skip(176)
+                        data_offset = reader.tell() + reader.read_int32()
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}::Unk2::PartInfo', 'LayerPartInfo', 0xC):
+                        part_count = reader.read_int32()
+                        data_offset = reader.tell() + reader.read_int32()
+                    reader.seek(data_offset)
+                    with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}::PartInfo::MaterialList', 'int', 4):
+                        materials = [reader.read_int32() for _ in range(part_count)]
+                    layer.bone_part_pairs.append(BonePartPair(2, bone_id, part_count, materials))
 
             if layer.p4:
                 reader.seek(layer.p4)
-                reader.skip(8)
-                reader.seek(reader.tell() + reader.read_int32())
-                reader.skip(0xB0)
-                reader.seek(reader.tell() + reader.read_int32())
-                part_count = reader.read_int32()
-                reader.seek(reader.tell() + reader.read_int32())
-                materials = [reader.read_int32() for _ in range(part_count)]
-                layer.bone_part_pairs.append(BonePartPair(3, -1, part_count, materials))
+                with reader.new_region(f'Layer_{n}::P4'):
+                    reader.skip(8)
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P4::Unk'):
+                    reader.skip(0xB0)
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P4::Unk::PartInfo'):
+                    part_count = reader.read_int32()
+                    data_offset = reader.tell() + reader.read_int32()
+                reader.seek(data_offset)
+                with reader.new_region(f'Layer_{n}::P4::Unk::PartInfo::MaterialList'):
+                    materials = [reader.read_int32() for _ in range(part_count)]
+                layer.bone_part_pairs.append(BonePartPair(1, -1, part_count, materials))
