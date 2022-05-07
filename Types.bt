@@ -21,11 +21,22 @@ struct Bone{
     uchar unk[12];
     int name_offset;
     byte parent_id;
-    uchar unk2[15];
+    byte unk2;
+    uchar unk3[14];
 };
 
 struct LayerPartInfo{
     int part_count;
     int material_list_offset;
     int unk_offset;
+};
+
+struct Part{
+    int magic;
+    int indices_count;
+    int16 vertex_size;
+    uchar unk1[10];
+    int vertex_offset,vertex_count, indices_offset;
+    int indices_buffer_id, vertices_buffer_id;
+    int unk2[4];
 };

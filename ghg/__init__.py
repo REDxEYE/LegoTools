@@ -118,16 +118,18 @@ class GHG:
         self.meshes: List[Mesh] = []
         for part_id, part_offset in enumerate(part_offsets):
             reader.seek(part_offset)
-            with reader.new_region(f'PartsInfo::Part_{part_id}'):
+            with reader.new_region(f'PartsInfo::Part_{part_id}', 'Part', 0x38):
                 assert reader.read_uint32() == 6
                 indices_count = reader.read_uint32() + 2
                 vertex_size = reader.read_int16()
-                reader.skip(0xa)
+                reader.skip(0xA)
                 vertex_offset, vertex_count, indices_offset = reader.read_fmt('3I')
                 indices_buffer_id, vertices_buffer_id = reader.read_fmt('2I')
+                reader.skip(0xF)
                 indices = indices_buffers[indices_buffer_id][indices_offset:indices_offset + indices_count]
+                offset_vertex_size = vertex_offset * vertex_size
                 vertices_buffer = vertex_buffers[vertices_buffer_id][
-                                  vertex_offset * vertex_size:vertex_offset * vertex_size + vertex_count * vertex_size]
+                                  offset_vertex_size:offset_vertex_size + vertex_count * vertex_size]
             mesh = Mesh(vertices_buffer, vertex_size, indices)
             self.meshes.append(mesh)
             del (indices_count, vertex_size, vertex_offset, vertex_count,
@@ -188,6 +190,11 @@ class GHG:
                     with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}::Unk2'):
                         reader.skip(176)
                         data_offset = reader.tell() + reader.read_int32()
+                        name_offset = reader.tell() + reader.read_int32()
+                        with reader.save_current_pos():
+                            reader.seek(name_offset)
+                            name = reader.read_ascii_string()
+                            print(f'unk2 name {name}')
                     reader.seek(data_offset)
                     with reader.new_region(f'Layer_{n}::P1::Unk_{bone_id}::Unk2::PartInfo', 'LayerPartInfo', 0xC):
                         part_count = reader.read_int32()
@@ -233,6 +240,11 @@ class GHG:
                     with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}::Unk2'):
                         reader.skip(176)
                         data_offset = reader.tell() + reader.read_int32()
+                        name_offset = reader.tell() + reader.read_int32()
+                        with reader.save_current_pos():
+                            reader.seek(name_offset)
+                            name = reader.read_ascii_string()
+                            print(f'unk2 name {name}')
                     reader.seek(data_offset)
                     with reader.new_region(f'Layer_{n}::P3::Unk_{bone_id}::Unk2::PartInfo', 'LayerPartInfo', 0xC):
                         part_count = reader.read_int32()

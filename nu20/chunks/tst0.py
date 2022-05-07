@@ -27,3 +27,4 @@ class TST0(Chunk):
                     guid = reader.read(16)
                     unk = reader.read(16)
                 self.meta.append(TextureMeta(width, height, guid, unk))
+        reader.seek(self.offset + self.size-8)

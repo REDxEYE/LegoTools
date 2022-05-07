@@ -35,7 +35,8 @@ class MS00(Chunk):
             for _ in range(material_count):
                 with reg.sub_region('MS00::Material'):
                     self.materials.append(Material(self.reader))
-            self.unk = reader.read_fmt('3i')
+            self.unk = reader.read_fmt('i')
+        reader.seek(self.offset + self.size - 8)
 
     def __getitem__(self, item):
         assert type(item) is int

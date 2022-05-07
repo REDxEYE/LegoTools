@@ -7,8 +7,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Union, BinaryIO, List, Optional
 
-from pyasn1_modules.rfc7906 import Register
-
 
 class OffsetOutOfBounds(Exception):
     pass
@@ -107,7 +105,7 @@ class ByteIO:
                         color = int.from_bytes(hashlib.sha256(child.name.encode('ascii')).digest()[:4], 'little')
                         writer.writerow(
                             [f'{child.type_name} {child.name}' + (
-                                f'[{child.size//child.sizeof}]' if child.size != child.sizeof else ''),
+                                f'[{child.size // child.sizeof}]' if child.size != child.sizeof else ''),
                              '',
                              f'{child.start:X}h',
                              f'{child.size:X}h',
